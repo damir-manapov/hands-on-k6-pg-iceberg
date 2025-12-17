@@ -41,6 +41,6 @@ export async function pgCreatePerson(name: string): Promise<Person> {
   return inserted as Person;
 }
 
-export async function pgListPeople(): Promise<Person[]> {
-  return db.selectFrom('people').selectAll().execute();
+export async function pgListPeople(limit = 100): Promise<Person[]> {
+  return db.selectFrom('people').selectAll().orderBy('id', 'desc').limit(limit).execute();
 }

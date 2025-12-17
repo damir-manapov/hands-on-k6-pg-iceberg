@@ -67,7 +67,7 @@ describe('Server E2E Tests', () => {
 
   describe('GET /pg/people', () => {
     it('should return an array of people', async () => {
-      const res = await fetch(`${BASE_URL}/pg/people`);
+      const res = await fetch(`${BASE_URL}/pg/people?limit=10`);
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -84,8 +84,8 @@ describe('Server E2E Tests', () => {
         body: JSON.stringify({ name }),
       });
 
-      // List all people
-      const res = await fetch(`${BASE_URL}/pg/people`);
+      // List recent people (with limit)
+      const res = await fetch(`${BASE_URL}/pg/people?limit=1000`);
       expect(res.status).toBe(200);
 
       const body = await res.json();

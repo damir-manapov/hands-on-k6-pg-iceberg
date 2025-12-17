@@ -25,7 +25,8 @@ pgRouter.post('/people', async (req, res) => {
   res.status(201).json(person);
 });
 
-pgRouter.get('/people', async (_req, res) => {
-  const people = await pgListPeople();
+pgRouter.get('/people', async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 10000);
+  const people = await pgListPeople(limit);
   res.json(people);
 });

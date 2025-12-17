@@ -91,8 +91,28 @@ pnpm compose:reset
 
 - `GET /pg/health` - Health check
 - `GET /pg/stats` - Table stats (count, size)
-- `GET /pg/people` - List all people
+- `GET /pg/people?limit=100` - List people (default limit 100, max 10000, ordered by newest first)
 - `POST /pg/people` - Create a person (`{ "name": "..." }`)
+
+### Postgres Unique Constraints (`/pg/unique`)
+
+- `POST /pg/unique/single` - Insert row with single-column unique constraint (col_a)
+- `POST /pg/unique/triple` - Insert row with triple-column unique constraint (col_a, col_b, col_c)
+- `POST /pg/unique/dual-triple` - Insert row with two triple-column unique constraints
+- `GET /pg/unique/:table/count` - Count rows in unique test table
+- `DELETE /pg/unique/:table` - Truncate unique test table
+
+### Postgres Balance (`/pg/balance`)
+
+Emulates accrual/withdrawal operations with a trigger that prevents negative balance per profile.
+
+- `POST /pg/balance` - Create a balance change (`{ "profile_id": 1, "accrual_doc_id": 100, "registrar_doc_id": 200, "amount": 1000 }`)
+- `GET /pg/balance/profile/:profileId` - Get balance for a profile
+- `GET /pg/balance/accrual/:accrualDocId` - Get balance for an accrual document
+- `GET /pg/balance/profile/:profileId/changes` - List changes for a profile
+- `GET /pg/balance/accrual/:accrualDocId/changes` - List changes for an accrual document
+- `GET /pg/balance/count` - Count all balance changes
+- `DELETE /pg/balance` - Truncate all balance changes
 
 ### Trino/Iceberg (`/trino`)
 
