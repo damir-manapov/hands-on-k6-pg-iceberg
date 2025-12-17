@@ -2,12 +2,12 @@
 
 Load-test a simple HTTP API backed by Postgres, alongside a Trino+Iceberg stack (Nessie + MinIO) via Docker Compose. The API uses Kysely for Postgres queries and Trino REST API for Iceberg.
 
-## Quickstart
+## Quickstart (Single Mode)
 
 1. Start services:
 
 ```bash
-docker compose -f compose/docker-compose.yml up -d
+pnpm compose:up
 ```
 
 2. Install deps and run the server:
@@ -44,19 +44,46 @@ pnpm stats
 pnpm optimize
 ```
 
-## Cluster Mode (Contention Testing)
+## Cluster Mode
 
-Run multiple server instances to test Iceberg write contention:
+Start a production-like cluster with PostgreSQL replication and Trino distributed execution:
 
 ```bash
-# Terminal 1: Start 10 workers sharing port 3000
-pnpm dev:cluster
+pnpm compose:up:cluster
+```
 
-# Terminal 2: Run contention test (50 VUs, 30s)
+This starts:
+
+- **PostgreSQL**: 1 primary + 2 replicas (1 sync, 1 async)
+- **Trino**: 1 coordinator + 2 workers
+
+### PostgreSQL Cluster
+
+| Node | Port | Mode | Description |
+|------|------|------|-------------|
+| pg-primary | 5432 | Read/Write | Primary node |
+| pg-replica-1 | 5433 | Read-only | Synchronous replica |
+| pg-replica-2 | 5434 | Read-only | Asynchronous replica |
+
+Run cluster-specific tests:
+
+```bash
+pnpm vitest run -c vitest.e2e.config.ts tests/e2e/pg-cluster.e2e.test.ts
+```
+
+### Trino Cluster
+
+The coordinator handles query planning, workers execute queries. Use `WORKERS=5 pnpm dev:cluster` to run multiple app instances for contention testing.
+
+```bash
 pnpm k6 tests/k6/contention.test.js
 ```
 
-Customize workers: `WORKERS=5 pnpm dev:cluster`
+### Reset Cluster
+
+```bash
+pnpm compose:reset
+```
 
 ## API Endpoints
 
@@ -76,12 +103,30 @@ Customize workers: `WORKERS=5 pnpm dev:cluster`
 - `POST /trino/people/batch` - Create a person (batched write, flushes every 500ms)
 - `POST /trino/optimize` - Compact small files into larger ones
 
+### Dual Write (`/dual`)
+
+- `GET /dual/health` - Health check (both PG and Trino)
+- `GET /dual/people` - List from both stores
+- `POST /dual/people` - Write to both PG and Trino simultaneously
+- `POST /dual/people/batch` - Write to PG immediately, batch Trino writes
+
 ## Services
 
-- Postgres on `localhost:5432` (user `postgres`, password `postgres`)
-- MinIO on `localhost:9000` (console `:9001`, user `minioadmin`, password `minioadmin`)
+### Single Mode
+
+- Postgres on `localhost:5432`
+- MinIO on `localhost:9000` (console `:9001`)
 - Nessie catalog on `localhost:19120`
 - Trino on `localhost:8080`
+
+### Cluster Mode
+
+- PostgreSQL primary on `localhost:5432`, replicas on `:5433`, `:5434`
+- MinIO on `localhost:9000` (console `:9001`)
+- Nessie catalog on `localhost:19120`
+- Trino coordinator on `localhost:8080`
+
+Credentials: `postgres/postgres` (PG), `minioadmin/minioadmin` (MinIO)
 
 ## Env
 
