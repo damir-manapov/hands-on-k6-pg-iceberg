@@ -3,6 +3,7 @@ import { ensureSchema, pool } from './clients/postgres.js';
 import { ensureTrinoSchema } from './clients/trino.js';
 import { pgRouter } from './routes/pg.js';
 import { pgUniqueRouter } from './routes/pg-unique.js';
+import { balanceRouter } from './routes/pg-balance.js';
 import { trinoRouter, flushTrinoBatchers } from './routes/trino.js';
 import { dualRouter, flushDualBatchers } from './routes/dual.js';
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 app.use('/pg', pgRouter);
 app.use('/pg/unique', pgUniqueRouter);
+app.use('/pg/balance', balanceRouter);
 app.use('/trino', trinoRouter);
 app.use('/dual', dualRouter);
 
