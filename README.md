@@ -35,8 +35,14 @@ pnpm k6 tests/k6/trino-batch.test.js
 # Unique constraint scenarios (single, triple, dual-triple columns)
 pnpm k6 tests/k6/pg-unique.test.js
 
+# Dual-triple unique inserts only (no duplicate stress)
+pnpm k6 tests/k6/pg-unique-dual-triple.test.js
+
 # Balance trigger scenarios (accruals, withdrawals, overdraft rejection)
 pnpm k6 tests/k6/pg-balance.test.js
+
+# Simple accruals + withdrawals (no overdraft stress)
+pnpm k6 tests/k6/pg-balance-simple.test.js
 ```
 
 5. View database stats:
@@ -66,11 +72,11 @@ This starts:
 
 ### PostgreSQL Cluster
 
-| Node | Port | Mode | Description |
-|------|------|------|-------------|
-| pg-primary | 5432 | Read/Write | Primary node |
-| pg-replica-1 | 5433 | Read-only | Synchronous replica |
-| pg-replica-2 | 5434 | Read-only | Asynchronous replica |
+| Node         | Port | Mode       | Description          |
+| ------------ | ---- | ---------- | -------------------- |
+| pg-primary   | 5432 | Read/Write | Primary node         |
+| pg-replica-1 | 5433 | Read-only  | Synchronous replica  |
+| pg-replica-2 | 5434 | Read-only  | Asynchronous replica |
 
 Run cluster-specific tests:
 

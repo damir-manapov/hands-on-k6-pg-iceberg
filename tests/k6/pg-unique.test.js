@@ -175,7 +175,8 @@ export function setup() {
 
 export function handleSummary(data) {
   const successTotal = data.metrics.insert_success?.values?.count || 0;
-  const duplicatesRejected = data.metrics.duplicate_rejected?.values?.count || 0;
+  const duplicatesRejected =
+    data.metrics.duplicate_rejected?.values?.count || 0;
 
   return {
     stdout: `

@@ -13,7 +13,9 @@ export async function createBalanceChange(change: InsertBalanceChange) {
 }
 
 // Get total balance for a profile
-export async function getBalanceByProfileId(profileId: number): Promise<number> {
+export async function getBalanceByProfileId(
+  profileId: number
+): Promise<number> {
   const result = await db
     .selectFrom('balance_changes')
     .select(sql<number>`COALESCE(SUM(amount), 0)`.as('balance'))
@@ -23,7 +25,9 @@ export async function getBalanceByProfileId(profileId: number): Promise<number> 
 }
 
 // Get total balance for an accrual document
-export async function getBalanceByAccrualDocId(accrualDocId: number): Promise<number> {
+export async function getBalanceByAccrualDocId(
+  accrualDocId: number
+): Promise<number> {
   const result = await db
     .selectFrom('balance_changes')
     .select(sql<number>`COALESCE(SUM(amount), 0)`.as('balance'))

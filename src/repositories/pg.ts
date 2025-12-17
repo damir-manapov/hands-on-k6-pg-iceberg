@@ -42,5 +42,10 @@ export async function pgCreatePerson(name: string): Promise<Person> {
 }
 
 export async function pgListPeople(limit = 100): Promise<Person[]> {
-  return db.selectFrom('people').selectAll().orderBy('id', 'desc').limit(limit).execute();
+  return db
+    .selectFrom('people')
+    .selectAll()
+    .orderBy('id', 'desc')
+    .limit(limit)
+    .execute();
 }

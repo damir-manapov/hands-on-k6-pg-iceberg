@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check, sleep, group } from 'k6';
+import { check, sleep } from 'k6';
 import { Counter, Trend, Rate } from 'k6/metrics';
 import { SharedArray } from 'k6/data';
 

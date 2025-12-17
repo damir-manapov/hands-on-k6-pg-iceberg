@@ -22,7 +22,8 @@ balanceRouter.post('/', async (req, res) => {
     typeof amount !== 'number'
   ) {
     res.status(400).json({
-      error: 'profile_id, accrual_doc_id, registrar_doc_id, and amount (all integers) required',
+      error:
+        'profile_id, accrual_doc_id, registrar_doc_id, and amount (all integers) required',
     });
     return;
   }
