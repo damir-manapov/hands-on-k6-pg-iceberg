@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { ensureSchema, pool } from './clients/postgres.js';
 import { ensureTrinoSchema } from './clients/trino.js';
 import { pgRouter } from './routes/pg.js';
+import { pgUniqueRouter } from './routes/pg-unique.js';
 import { trinoRouter, flushTrinoBatchers } from './routes/trino.js';
 import { dualRouter, flushDualBatchers } from './routes/dual.js';
 
@@ -11,6 +12,7 @@ const app = express();
 app.use(express.json());
 
 app.use('/pg', pgRouter);
+app.use('/pg/unique', pgUniqueRouter);
 app.use('/trino', trinoRouter);
 app.use('/dual', dualRouter);
 
