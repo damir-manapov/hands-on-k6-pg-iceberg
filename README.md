@@ -26,10 +26,17 @@ pnpm test:e2e
 4. Run k6 load tests:
 
 ```bash
+# Basic tests
 pnpm k6 tests/k6/pg-basic.test.js
 pnpm k6 tests/k6/pg-create.test.js
 pnpm k6 tests/k6/trino-create.test.js
 pnpm k6 tests/k6/trino-batch.test.js
+
+# Unique constraint scenarios (single, triple, dual-triple columns)
+pnpm k6 tests/k6/pg-unique.test.js
+
+# Balance trigger scenarios (accruals, withdrawals, overdraft rejection)
+pnpm k6 tests/k6/pg-balance.test.js
 ```
 
 5. View database stats:
