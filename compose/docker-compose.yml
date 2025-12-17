@@ -1,0 +1,233 @@
+services:
+  starter:
+    image: curlimages/curl:8.17.0
+    profiles: ['single']
+    depends_on:
+      - postgres
+      - minio
+      - nessie
+      - trino
+      - create-minio-bucket
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -e
+        echo "Waiting for Postgres..." && (until nc -z postgres 5432; do sleep 1; done)
+        echo "Waiting for MinIO..." && (until nc -z minio 9000; do sleep 1; done)
+        echo "Waiting for Nessie..." && (until curl -fs http://nessie:19120/; do sleep 1; done)
+        echo "Waiting for Trino..." && (until curl -fs http://trino:8080/v1/info; do sleep 1; done)
+        echo "All services ready"
+
+  starter-cluster:
+    image: curlimages/curl:8.17.0
+    profiles: ['cluster']
+    depends_on:
+      - pg-primary
+      - pg-replica-1
+      - pg-replica-2
+      - minio
+      - nessie
+      - trino-coordinator
+      - trino-worker-1
+      - trino-worker-2
+      - create-minio-bucket
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -e
+        echo "Waiting for Postgres primary..." && (until nc -z pg-primary 5432; do sleep 1; done)
+        echo "Waiting for Postgres replica 1..." && (until nc -z pg-replica-1 5432; do sleep 1; done)
+        echo "Waiting for Postgres replica 2..." && (until nc -z pg-replica-2 5432; do sleep 1; done)
+        echo "Waiting for MinIO..." && (until nc -z minio 9000; do sleep 1; done)
+        echo "Waiting for Nessie..." && (until curl -fs http://nessie:19120/; do sleep 1; done)
+        echo "Waiting for Trino coordinator..." && (until curl -fs http://trino-coordinator:8080/v1/info; do sleep 1; done)
+        echo "Waiting for Trino workers..."
+        until nc -z trino-worker-1 8080 && nc -z trino-worker-2 8080; do sleep 1; done
+        sleep 3
+        echo "Cluster ready: PG (1 primary + 2 replicas), Trino (1 coordinator + 2 workers)"
+
+  postgres:
+    image: postgres:18.1-alpine
+    profiles: ['single']
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: appdb
+    ports:
+      - '5432:5432'
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  # PostgreSQL cluster mode - primary
+  pg-primary:
+    image: postgres:18.1-alpine
+    profiles: ['cluster']
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: appdb
+    ports:
+      - '5432:5432'
+    volumes:
+      - pg_primary_data:/var/lib/postgresql/data
+      - ./pg-cluster/init-primary.sh:/docker-entrypoint-initdb.d/init-primary.sh:ro
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c hot_standby=on
+
+  # PostgreSQL cluster mode - replica 1 (SYNC)
+  pg-replica-1:
+    image: postgres:18.1-alpine
+    profiles: ['cluster']
+    depends_on:
+      - pg-primary
+    environment:
+      PGPASSWORD: postgres
+    ports:
+      - '5433:5432'
+    volumes:
+      - pg_replica1_data:/var/lib/postgresql/data
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        mkdir -p /var/lib/postgresql/data
+        chown postgres:postgres /var/lib/postgresql/data
+        chmod 700 /var/lib/postgresql/data
+        until pg_isready -h pg-primary -p 5432 -U postgres; do sleep 1; done
+        if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+          rm -rf /var/lib/postgresql/data/*
+          for i in 1 2 3 4 5; do
+            su postgres -c "pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U postgres -Fp -Xs -P -R" && break
+            echo "Retry $$i..."
+            sleep 2
+          done
+          echo "primary_conninfo = 'host=pg-primary port=5432 user=postgres password=postgres application_name=pg_replica_1'" >> /var/lib/postgresql/data/postgresql.auto.conf
+          chown postgres:postgres /var/lib/postgresql/data/postgresql.auto.conf
+        fi
+        exec su postgres -c "postgres -D /var/lib/postgresql/data"
+
+  # PostgreSQL cluster mode - replica 2 (ASYNC)
+  pg-replica-2:
+    image: postgres:18.1-alpine
+    profiles: ['cluster']
+    depends_on:
+      - pg-primary
+    environment:
+      PGPASSWORD: postgres
+    ports:
+      - '5434:5432'
+    volumes:
+      - pg_replica2_data:/var/lib/postgresql/data
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        mkdir -p /var/lib/postgresql/data
+        chown postgres:postgres /var/lib/postgresql/data
+        chmod 700 /var/lib/postgresql/data
+        until pg_isready -h pg-primary -p 5432 -U postgres; do sleep 1; done
+        if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+          rm -rf /var/lib/postgresql/data/*
+          for i in 1 2 3 4 5; do
+            su postgres -c "pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U postgres -Fp -Xs -P -R" && break
+            echo "Retry $$i..."
+            sleep 2
+          done
+        fi
+        exec su postgres -c "postgres -D /var/lib/postgresql/data"
+        fi
+        exec su postgres -c "postgres -D /var/lib/postgresql/data"
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+
+  nessie:
+    image: ghcr.io/projectnessie/nessie:0.106.0
+    environment:
+      QUARKUS_HTTP_PORT: 19120
+    ports:
+      - '19120:19120'
+
+  trino:
+    image: trinodb/trino:479
+    profiles: ['single']
+    depends_on:
+      - nessie
+      - minio
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./trino/config.properties:/etc/trino/config.properties:ro
+      - ./trino/jvm.config:/etc/trino/jvm.config:ro
+      - ./trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+
+  # Trino cluster mode - coordinator
+  trino-coordinator:
+    image: trinodb/trino:479
+    profiles: ['cluster']
+    depends_on:
+      - nessie
+      - minio
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./trino-cluster/coordinator.properties:/etc/trino/config.properties:ro
+      - ./trino-cluster/jvm.config:/etc/trino/jvm.config:ro
+      - ./trino-cluster/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+
+  # Trino cluster mode - worker 1
+  trino-worker-1:
+    image: trinodb/trino:479
+    profiles: ['cluster']
+    depends_on:
+      - trino-coordinator
+    volumes:
+      - ./trino-cluster/worker.properties:/etc/trino/config.properties:ro
+      - ./trino-cluster/jvm.config:/etc/trino/jvm.config:ro
+      - ./trino-cluster/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+
+  # Trino cluster mode - worker 2
+  trino-worker-2:
+    image: trinodb/trino:479
+    profiles: ['cluster']
+    depends_on:
+      - trino-coordinator
+    volumes:
+      - ./trino-cluster/worker.properties:/etc/trino/config.properties:ro
+      - ./trino-cluster/jvm.config:/etc/trino/jvm.config:ro
+      - ./trino-cluster/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+
+  create-minio-bucket:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      - minio
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        until mc alias set local http://minio:9000 minioadmin minioadmin 2>/dev/null; do
+          echo "Waiting for MinIO..."
+          sleep 2
+        done
+        mc mb -p local/warehouse || true
+        mc anonymous set public local/warehouse || true
+        echo "Bucket 'warehouse' ready"
+
+volumes:
+  pg_data:
+  pg_primary_data:
+  pg_replica1_data:
+  pg_replica2_data:
+  minio_data:
