@@ -10,8 +10,8 @@ const operationLatency = new Trend('operation_latency');
 const BASE = 'http://localhost:3000';
 
 export const options = {
-  vus: 20,
-  duration: '30s',
+  vus: 100,
+  duration: '300s',
   thresholds: {
     http_req_failed: ['rate<0.01'], // Less than 1% failures
     operation_latency: ['p(95)<100'],
@@ -56,7 +56,7 @@ export default function () {
     }
   }
 
-  sleep(0.05);
+  // sleep(0.05);
 }
 
 export function setup() {
@@ -79,8 +79,13 @@ export function setup() {
 export function handleSummary(data) {
   const accruals = data.metrics.accrual_success?.values?.count || 0;
   const withdrawals = data.metrics.withdrawal_success?.values?.count || 0;
+  const total = accruals + withdrawals;
   const p50 = data.metrics.operation_latency?.values?.['p(50)'] || 0;
   const p95 = data.metrics.operation_latency?.values?.['p(95)'] || 0;
+
+  // Calculate throughput from http_reqs metric
+  const httpReqs = data.metrics.http_reqs?.values?.rate || 0;
+  const iterRate = data.metrics.iterations?.values?.rate || 0;
 
   return {
     stdout: `
@@ -89,7 +94,10 @@ export function handleSummary(data) {
 =====================================
 Accruals:    ${accruals}
 Withdrawals: ${withdrawals}
-Total:       ${accruals + withdrawals}
+Total:       ${total}
+-------------------------------------
+Throughput:  ${iterRate.toFixed(1)} ops/s
+HTTP Reqs:   ${httpReqs.toFixed(1)} req/s
 -------------------------------------
 Latency p50: ${p50.toFixed(1)}ms
 Latency p95: ${p95.toFixed(1)}ms
